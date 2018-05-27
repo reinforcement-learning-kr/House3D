@@ -53,9 +53,10 @@ class A3C_LSTM_GA(nn.Module):
 
   def action(self, x, target, hx, cx):
     value, prob, hx, cx = self.forward(x, target, hx, cx)
-    prob_ = probs.data.cpu().numpy()
+    prob_ = prob.data.cpu().numpy()
   
     ## get action stochastically
-    act = [np.nonzero(np.random.multinomial(1, p))[0] for p in probs_]
+    act = [np.nonzero(np.random.multinomial(1, p))[0] 
+            for p in prob_]
   
     return value, prob, act[0][0], hx, cx

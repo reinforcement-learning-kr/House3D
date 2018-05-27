@@ -2,12 +2,14 @@ from House3D import Environment, objrender, load_config
 from House3D.roomnav import RoomNavTask
 from model import A3C_LSTM_GA
 from collections import deque
-from utils import cuda
+from tensorboardX import SummaryWriter
 import numpy as np
 import args
 
+
 from torch.autograd import Variable
 import torch
+
 
 EPISODE=100000
 
@@ -27,6 +29,8 @@ houses = ['00065ecbdd7300d35ef4328ffe871505',
     '1dba3a1039c6ec1a3c141a1cb0ad0757',
     '5f3f959c7b3e6f091898caa8e828f110']
 
+## tensorboard
+writer = SummaryWriter(log_dir="./checkpoints/log")
 
 def cuda(x):
   if torch.cuda.is_available():
@@ -45,6 +49,7 @@ def main():
 
   succ = deque(maxlen=500)
   traj = []
+  total_step = 0
 
   ## main loop for interact with environment
   for i in range(EPISODE):
@@ -68,14 +73,15 @@ def main():
       total_rew += rew
       
       ## append data
-      traj.append([obs, act, rew, done, prob, value])
+      traj.append([act, rew, done, prob, value])
       
       ## train!
       if len(traj) == args.max_steps:
-        train(traj)
+        train(traj, total_step)
         traj = []
 
       step += 1
+      total_step += 1
 
       obs = next_obs
       
@@ -83,7 +89,7 @@ def main():
         if done:
           good = 1
         succ.append(good)
-      
+        
         ## print logs
         print("\n+++++++++++++ status ++++++++++++")
         print("Episode {:4d}, Reward: {:2.3f}".format(i+1, total_rew))
@@ -91,14 +97,35 @@ def main():
         print("Success rate {:3.2f}%".format(np.sum(succ)/len(succ)*100))
         break
 
+        ## tensorboard summary writer
+        writer.add_scalar("Success rate", np.sum(succ)/len(succ), i+1)
+        writer.add_scalar("Reward", total_rew, i+1)
 
-def train(traj):
+
+def train(traj, step):
   acts, rews, dones, probs, values = list(zip(*traj))
   
   acts = np.eye(10)[[acts]]
-  rews = torch.FloatTensor(rews)
+  rews = cuda(torch.FloatTensor(rews))
   dones = 1 - np.array(dones)
   probs = torch.stack(probs)
+  values = torch.stack(values)
+  
+
+  ## initialize R
+  value_loss = 0
+  policy_loss = 0
+  R = torch.zeros(1)
+  if dones[-1]:
+    R = values[-1]
+  
+  ## GAE
+  for i in reversed(range(len(dones))):
+    R = args.gamma * R + rews[i]
+    advantages = R - values[i]
+    
+    value_loss += 0
+
 
 if __name__ == "__main__":
   main()
