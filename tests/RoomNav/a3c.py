@@ -108,7 +108,7 @@ def main():
         
         succ_rate = torch.FloatTensor([np.sum(succ)/len(succ)*100])
         writer.add_scalar('train/succ_rate', succ_rate[0], i)
-        reward = torch.FloatTenosr([total_rew])
+        reward = torch.FloatTensor([total_rew])
         writer.add_scalar('train/reward', reward[0], i)
         break
 
@@ -132,7 +132,7 @@ def train(traj, value, net, optimizer, entropies, step):
   ## GAE
   for i in reversed(range(len(dones))):
     if dones[i]:
-      R = cuda(torch.zeros(1))
+      R = cuda(torch.zeros(1)).data
     R = args.gamma * R + rews[i]
     advantages = R - values[i]
     value_loss += value_loss + 0.5 * advantages.pow(2)
