@@ -1,15 +1,20 @@
 from House3D import Environment, objrender, load_config
 from House3D.roomnav import RoomNavTask
 from collections import deque
+from tensorboardX import SummaryWriter
 import tqdm
 import numpy as np
 
+import torch
 
-EPISODE=1000
+
+EPISODE=300
 
 api = objrender.RenderAPI(
     w=400, h=300, device=0)
 cfg = load_config('config.json')
+
+writer = SummaryWriter('./checkpoints/log')
 
 houses = ['00065ecbdd7300d35ef4328ffe871505',
     'cf57359cd8603c3d9149445fb4040d90', '31966fdc9f9c87862989fae8ae906295',
@@ -20,7 +25,7 @@ houses = ['00065ecbdd7300d35ef4328ffe871505',
     '1dba3a1039c6ec1a3c141a1cb0ad0757',
     '5f3f959c7b3e6f091898caa8e828f110']
 
-env = Environment(api, np.random.choice(houses, 1)[0], cfg)
+env = Environment(api, houses[0], cfg)#np.random.choice(houses, 1)[0], cfg)
 task = RoomNavTask(env, hardness=0.6, discrete_action=True)
 
 succ = deque(maxlen=500)
@@ -45,4 +50,8 @@ for i in range(EPISODE):
       print("Episode %04d, Reward: %2.3f" %(i+1, total_rew))
       print("Target %s" %task.info['target_room'])
       print("Success rate {:3.2f}%".format(np.sum(succ)/len(succ)*100))
+      
+      succ_rate = torch.FloatTensor([np.sum(succ)/len(succ)*100])
+      writer.add_scalar('test/succ_rate', succ_rate[0], i)
+      
       break

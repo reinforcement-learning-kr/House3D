@@ -53,7 +53,7 @@ class A3C_LSTM_GA(nn.Module):
 
   def action(self, x, target, hx, cx):
     value, prob, hx, cx = self.forward(x, target, hx, cx)
-    prob_ = prob.data.cpu().numpy()
+    prob_ = F.softmax(prob).data.cpu().numpy()
   
     ## get action stochastically
     act = [np.nonzero(np.random.multinomial(1, p))[0] 
