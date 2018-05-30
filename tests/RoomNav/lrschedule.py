@@ -7,3 +7,9 @@ def noam_learning_rate_decay(init_lr, global_step, warmup_steps=2000):
       step * warmup_steps**-1.5, step**-0.5)
 
   return lr
+
+
+def step_learning_rate_decay(init_lr, global_step, 
+                             anneal_rate=0.98,
+                             anneal_interval=30000):
+  return init_lr * anneal_rate ** (global_step // anneal_interval)

@@ -53,5 +53,7 @@ for i in range(EPISODE):
       
       succ_rate = torch.FloatTensor([np.sum(succ)/len(succ)*100])
       writer.add_scalar('test/succ_rate', succ_rate[0], i)
+      rand = torch.rand(1)
+      writer.add_scalar('test/random', rand[0], i)
       
       break

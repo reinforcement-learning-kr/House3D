@@ -106,6 +106,7 @@ def main():
         print("Entropy {:4.4f}".format(np.mean(entropies)))
         print("Success rate {:3.2f}%".format(np.sum(succ)/len(succ)*100))
         
+        ## write tensorboard logs
         succ_rate = torch.FloatTensor([np.sum(succ)/len(succ)*100])
         writer.add_scalar('train/succ_rate', succ_rate[0], i)
         reward = torch.FloatTensor([total_rew])
@@ -123,12 +124,15 @@ def train(traj, value, net, optimizer, entropies, step):
   values = torch.stack(values)
   values = torch.cat((values, value[None]), dim=0)
 
-  ## initialize R
+  ## initialize
   value_loss = 0
   policy_loss = 0
   R = values[-1].data
   gae = cuda(torch.zeros(1, 1))
   
+  ## apply learning rate schedule
+
+
   ## GAE
   for i in reversed(range(len(dones))):
     if dones[i]:
@@ -143,11 +147,16 @@ def train(traj, value, net, optimizer, entropies, step):
     log_prob = (F.log_softmax(probs[i]) * acts[i].data).sum(1)
     entropy = -(log_prob * probs[i]).sum(1)
     
-    policy_loss -= log_prob * Variable(gae) - 0.01*(log_prob * probs[i]).sum(1)
+    policy_loss -= log_prob * Variable(gae) + 0.01 * entropy
     entropies.append(entropy.data.cpu().numpy())
 
   optimizer.zero_grad()
-
+  
+  ## tensorboard
+  writer.add_scalar('train/v_loss', value_loss.data[0], step)
+  writer.add_scalar('train/p_loss', policy_loss.data[0], step)
+  
+  ## calculate and apply gradients
   (policy_loss + 0.5 * value_loss).backward(retain_graph=True)
   torch.nn.utils.clip_grad_norm(net.parameters(), 40)
 
