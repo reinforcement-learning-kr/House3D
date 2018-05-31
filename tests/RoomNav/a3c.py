@@ -42,9 +42,9 @@ def cuda(x):
 
 def main():
   ## make environment and task
-  env = Environment(api, np.random.choice(houses, 1)[0], cfg)
+  # env = Environment(api, np.random.choice(houses, 1)[0], cfg) # single house
+  env = MultiHouseEnv(api, houses, cfg) # multi house
   task = RoomNavTask(env, hardness=0.6, discrete_action=True)
-  
   ## make gated attention network
   net = cuda(A3C_LSTM_GA(len(targets)))
   
@@ -127,16 +127,21 @@ def train(traj, value, net, optimizer, entropies, step):
   ## initialize
   value_loss = 0
   policy_loss = 0
-  R = values[-1].data
+  R = Variable(values[-1].data, required_grad=False)
   gae = cuda(torch.zeros(1, 1))
   
   ## apply learning rate schedule
-
+  curr_lr = args.learning_rate
+  if args.lrschedule != None:
+    lr_schedule_f = getattr(lrschedule, args.lrschedule)
+    curr_lr = lr_schedule_f(args.learinig_rate, step)
+    for param_group in optimzer.param_groups:
+      param_group['lr'] = curr_lr
 
   ## GAE
   for i in reversed(range(len(dones))):
     if dones[i]:
-      R = cuda(torch.zeros(1)).data
+      R = Variable(cuda(torch.zeros(1)).data, required_grad=False)
     R = args.gamma * R + rews[i]
     advantages = R - values[i]
     value_loss += value_loss + 0.5 * advantages.pow(2)
@@ -155,7 +160,8 @@ def train(traj, value, net, optimizer, entropies, step):
   ## tensorboard
   writer.add_scalar('train/v_loss', value_loss.data[0], step)
   writer.add_scalar('train/p_loss', policy_loss.data[0], step)
-  
+  writer.add_scalar('train/lr', torch.FloatTensor([curr_lr]).data[0], step)
+
   ## calculate and apply gradients
   (policy_loss + 0.5 * value_loss).backward(retain_graph=True)
   torch.nn.utils.clip_grad_norm(net.parameters(), 40)
