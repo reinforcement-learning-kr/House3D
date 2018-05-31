@@ -1,4 +1,4 @@
-from House3D import Environment, objrender, load_config
+from House3D import MultiHouseEnv, Environment, objrender, load_config
 from House3D.roomnav import RoomNavTask
 from model import A3C_LSTM_GA
 from collections import deque
@@ -42,8 +42,8 @@ def cuda(x):
 
 def main():
   ## make environment and task
-  # env = Environment(api, np.random.choice(houses, 1)[0], cfg) # single house
-  env = MultiHouseEnv(api, houses, cfg) # multi house
+  env = Environment(api, np.random.choice(houses, 1)[0], cfg) # single house
+  # env = MultiHouseEnv(api, houses, cfg) # multi house
   task = RoomNavTask(env, hardness=0.6, discrete_action=True)
   ## make gated attention network
   net = cuda(A3C_LSTM_GA(len(targets)))
@@ -123,11 +123,13 @@ def train(traj, value, net, optimizer, entropies, step):
   probs = torch.stack(probs)
   values = torch.stack(values)
   values = torch.cat((values, value[None]), dim=0)
+  
+  acts = Variable(acts)
 
   ## initialize
   value_loss = 0
   policy_loss = 0
-  R = Variable(values[-1].data, required_grad=False)
+  R = Variable(values[-1].data)
   gae = cuda(torch.zeros(1, 1))
   
   ## apply learning rate schedule
@@ -141,7 +143,7 @@ def train(traj, value, net, optimizer, entropies, step):
   ## GAE
   for i in reversed(range(len(dones))):
     if dones[i]:
-      R = Variable(cuda(torch.zeros(1)).data, required_grad=False)
+      R = Variable(cuda(torch.zeros(1)))
     R = args.gamma * R + rews[i]
     advantages = R - values[i]
     value_loss += value_loss + 0.5 * advantages.pow(2)
@@ -149,7 +151,7 @@ def train(traj, value, net, optimizer, entropies, step):
     delta_t = rews[i] + args.gamma*values[i+1].data - values[i].data
     gae = gae * args.gamma * args.tau + delta_t
 
-    log_prob = (F.log_softmax(probs[i]) * acts[i].data).sum(1)
+    log_prob = (F.log_softmax(probs[i]) * acts[i]).sum(1)
     entropy = -(log_prob * probs[i]).sum(1)
     
     policy_loss -= log_prob * Variable(gae) + 0.01 * entropy
