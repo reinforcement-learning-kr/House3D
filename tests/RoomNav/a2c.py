@@ -1,7 +1,6 @@
 from House3D import MultiHouseEnv, Environment, objrender, load_config
 from House3D.roomnav import RoomNavTask
 from model import A3C_LSTM_GA
-from wrapper import MultiTaskEnv
 from collections import deque
 from tensorboardX import SummaryWriter
 import numpy as np
@@ -13,7 +12,7 @@ import torch.nn.functional as F
 import torch
 
 
-step=50000000
+EPISODE=100000
 
 api = objrender.RenderAPI(
     w=400, h=300, device=0)
@@ -43,12 +42,9 @@ def cuda(x):
 
 def main():
   ## make environment and task
-  # env = Environment(api, np.random.choice(houses, 1)[0], cfg) # single house
-  env = MultiHouseEnv(api, houses, cfg) # multi house
-  tasks = [RoomNavTask(env, hardness=0.6, discrete_action=True)
-           for _ in range(args.n_workers)]
-  task = MultiTaskEnv(tasks)
-
+  env = Environment(api, np.random.choice(houses, 1)[0], cfg) # single house
+  # env = MultiHouseEnv(api, houses, cfg) # multi house
+  task = RoomNavTask(env, hardness=0.6, discrete_action=True)
   ## make gated attention network
   net = cuda(A3C_LSTM_GA(len(targets)))
   
@@ -59,10 +55,14 @@ def main():
   
   traj = []
   ## main loop for interact with environment
-  for i in range(STEP//args.n_worker):
+  for i in range(EPISODE):
     ## initialize task
     step, total_rew, good = 0, 0, 0
     obs = task.reset()
+    target = task.info['target_room']
+
+    target = [1 if t == target else 0 for t in targets]
+    target = cuda(Variable(torch.FloatTensor(target)))
 
     ## initialize hidden state
     hx = cuda(Variable(torch.zeros(1, 256)))
